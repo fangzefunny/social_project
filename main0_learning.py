@@ -8,13 +8,32 @@ Code for gender counter-stereotype
 ################################
 
 import os 
-import numpy as np 
+import numpy as np
+from numpy.lib.function_base import _insert_dispatcher 
 import pandas as pd
 import pickle 
+from collections import OrderedDict
 from test1_feature_extraction import float_weights
 
 dir = os.path.dirname(os.path.abspath(__file__))
 
+class cat_map:
+
+    def __init__( self, in_dict):
+        self.dist = in_dict
+        self.cat_keys = list(in_dict.keys())
+    
+    def str_to_idx( self, cat_str):
+        return self.cat_keys.index( cat_str)
+
+    def idx_to_str( self, cat_idx):
+        return self.cat_keys[ cat_idx]
+
+    def str_to_prob( self, cat_str):
+        return self.dist[ cat_str]
+
+    def idx_to_prob( self, cat_idx):
+        return self.dist[ cat_idx]
 
 def learn_dist( data, filters):
     '''Sorted all cat
@@ -73,9 +92,33 @@ def learn_dist( data, filters):
         # where nv is the state size, and nP is the paranets
         # configuration. Learning using bayeisan method
         prior = 1 / (len(mcats) + len(fcats))
-        cat[mkey] = (mcats + prior) / np.sum( mcats + prior)
-        cat[fkey] = (fcats + prior) / np.sum( fcats + prior)
+        norm_male = (mcats + prior) / np.sum( mcats + prior)
+        norm_female = (fcats + prior) / np.sum( fcats + prior)
+        sorted_ind = (norm_male + norm_female).sort_values( ascending=False).index
+        cat[mkey] = cat_map(norm_male.reindex( sorted_ind))
+        cat[fkey] = cat_map(norm_female.reindex( sorted_ind))
+
     return cat
+
+def idx_cat( data, filters, cat):
+    '''Assign idx to the str
+
+    Inputs: 
+        data: the data we need to make change on
+        filters: a dict tells the column to index on
+        cats: dict tells the str-idx map 
+
+    Output:
+        data: transformed data
+    '''
+    for key in filters:
+        cols = filters[key]
+        mapping = cat[key]
+        for col in cols: 
+            ind_lst = [ mapping.str_to_idx(in_str) 
+                        for in_str in data.iloc[ :, col] ]
+            data.iloc[ :, col] = ind_lst 
+    return data 
 
 if __name__ == "__main__":
 
@@ -95,9 +138,15 @@ if __name__ == "__main__":
     
     # extract state space for N and V variables
     cat = learn_dist( raw_data, filters)
-    
-    # save the learned distribution 
+
+    # translate cat str to cat idx 
+    processed_data = idx_cat( raw_data, filters, cat)
+
+    # save the learned distribution  
     with open( dir + '/data/cat_dists.pkl', 'wb') as handle: 
         pickle.dump( cat, handle)
+
+    # save the floatize data 
+    processed_data.to_csv( dir + '/data/processed_data.csv')
 
 

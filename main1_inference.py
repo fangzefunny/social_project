@@ -3,27 +3,52 @@ Code for gender counter-stereotype
 @author Zeming Fang
 '''
 
+import os 
+import arviz as az 
 import pymc3 as pm 
 import numpy as np 
-import matplotlib.pyplot as plt 
+import pandas as pd 
+import matplotlib.pyplot as plt
+from pymc3.distributions.continuous import HalfNormal 
 
-# gnerate the artificial data 
-obs_y = 1#np.random.normal( .5, .35, 2000)
+# build generative model
+def get_model( y_target, params):
+    '''Reason net for stereotype
 
-# model that data with a simple bayesian model 
-with pm.Model() as exercise1:
+    The probability model is: 
+        p_male ~ Beta( b1, b2)
+        ismale ~ Ber( p_male) 
+        name ~ Cat( name_params[ismale])
+        verb ~ Cat( verb_params[ismale])
+    '''
+    # load the evidence
+    name_evid = y_target['name']
+    verb_evid = y_target['verb']
 
-    rho1 = pm.Beta( 'male-prob', alpha=1, beta=1)
-    
-    mal_data = pm.Categorical( 'N')
-    female_data = 
-    y = pm.Normal( 'y', mu=mu, sd=stdev, observed=obs_y)
-    
-if __name__ == "__main__":
+    # load distribution
+    name_dist = params['name']
+    verb_dist = params['verb']
 
-    with exercise1:
-        trace = pm.sample(1000, cores=2)
+    # use the pm.module
+    reason_net = pm.Model()
 
-        pm.traceplot( trace, ['mu', 'stdev'])
-        plt.show() 
+    # handcrafted the relationship
+    with reason_net:
+
+        # estimate the prior for the 
+        alpha = HalfNormal( 'alpha', sigma=20)
+        beta  = HalfNormal( 'beta', sigma=20)
+
+        # sample male or female 
+        p_male = pm.Beta( 'prior', alpha=alpha, beta=beta)
+
+        # choose the correct params
+        ismale = pm.Bernoulli( 'ismale', p_male)
+        name_params = pm.math.switch( ismale == 1, name_evid['female'])
+        verb_params = pm.math.switch( ismale == 1, verb_evid['female'])
+        y_obs1 = pm.Categorical( 'name', p=name_params, observed=name_evid)
+        y_obs2 = pm.Categorical( 'verb', p=verb_params, observed=verb_evid)
+
+
+
     
