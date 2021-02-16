@@ -1,1 +1,1 @@
-# social_project
+# Social Stereotype
